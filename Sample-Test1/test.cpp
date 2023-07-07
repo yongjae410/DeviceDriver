@@ -2,7 +2,6 @@
 #include "gmock/gmock.h"
 #include "../Project1/DeviceDriver.cpp"
 
-#include <iostream>
 using namespace std;
 using namespace testing;
 
@@ -13,27 +12,49 @@ public:
 	MOCK_METHOD(void, write, (long address, unsigned char data), ());
 };
 
-TEST(DeviceDriverTest, ReadSuccessTest)
+class DeviceDriverFixture : public Test
 {
-	FlashMock mock;
+public:
+	DeviceDriverFixture()
+	{
+		driver = new DeviceDriver(&mock);
+	}
 
+	FlashMock mock;
+	DeviceDriver* driver;
+};
+
+TEST_F(DeviceDriverFixture, ReadSuccessTest)
+{
 	EXPECT_CALL(mock, read(_))
 		.Times(5)
 		.WillRepeatedly(Return(123));
 
-	DeviceDriver driver(&mock);
-	EXPECT_THAT(driver.read(0), Eq(123));
+	EXPECT_THAT(driver->read(0), Eq(123));
 }
 
-TEST(DeviceDriverTest, ReadFailTest)
+TEST_F(DeviceDriverFixture, ReadFailTest)
 {
-	FlashMock mock;
-
-	int temp = 123;
 	EXPECT_CALL(mock, read(_))
-		.Times(5)
-		.WillRepeatedly(Return(temp++));
+		.WillOnce(Return(123))
+		.WillRepeatedly(Return(456));
+	
+	EXPECT_THROW(driver->read(0), ReadFailException);
+}
 
-	DeviceDriver driver(&mock);
-	EXPECT_THAT(driver.read(0), Ne(temp));
+TEST_F(DeviceDriverFixture, WriteSuccessTest)
+{
+	EXPECT_CALL(mock, read(0x1000))
+		.Times(1)
+		.WillOnce(Return(0xFF));
+	
+	driver->write(0x1000, 0x10);
+}
+
+TEST_F(DeviceDriverFixture, WriteFailTest)
+{
+	EXPECT_CALL(mock, read(0x1000))
+		.WillRepeatedly(Return(0x00));
+	
+	EXPECT_THROW(driver->write(0x1000, 0x10), WriteFailException);
 }
